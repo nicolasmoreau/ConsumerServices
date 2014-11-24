@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0" xmlns:xsams="http://vamdc.org/xml/xsams/1.0">
-    
-    <xsl:output method="html" indent="no"/>
+
+    <xsl:output method="html" indent="no" doctype-public="-//W3C//DTD XHTML 1.0 Strict//EN" doctype-system="http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"/>
     <xsl:strip-space elements="*"/>
     
     <xsl:decimal-format name="fixnan" NaN="" />
@@ -14,10 +14,14 @@
     <!-- test if node exists or not to hide unwanted columns -->
     <xsl:variable name="stateRefCount" select="count(/xsams:XSAMSData/xsams:Species/xsams:Atoms/xsams:Atom/xsams:Isotope/xsams:Ion/xsams:AtomicState/xsams:SourceRef)" />
     <xsl:variable name="radiativeTransitionRefCount" select="count(/xsams:XSAMSData/xsams:Processes/xsams:Radiative/xsams:RadiativeTransition/xsams:SourceRef)" />
+    <xsl:variable name="wavelengthCount" select="count(/xsams:XSAMSData/xsams:Processes/xsams:Radiative/xsams:RadiativeTransition/xsams:EnergyWavelength/xsams:Wavelength)" />    
     <xsl:variable name="wavelengthRefCount" select="count(/xsams:XSAMSData/xsams:Processes/xsams:Radiative/xsams:RadiativeTransition/xsams:EnergyWavelength/xsams:Wavelength/xsams:SourceRef)" />    
     <xsl:variable name="wavenumberCount" select="count(/xsams:XSAMSData/xsams:Processes/xsams:Radiative/xsams:RadiativeTransition/xsams:EnergyWavelength/xsams:Wavenumber)" />
+    <xsl:variable name="wavenumberRefCount" select="count(/xsams:XSAMSData/xsams:Processes/xsams:Radiative/xsams:RadiativeTransition/xsams:EnergyWavelength/xsams:Wavenumber/xsams:SourceRef)" />
     <xsl:variable name="energyCount" select="count(/xsams:XSAMSData/xsams:Processes/xsams:Radiative/xsams:RadiativeTransition/xsams:EnergyWavelength/xsams:Energy)" />
+    <xsl:variable name="energyRefCount" select="count(/xsams:XSAMSData/xsams:Processes/xsams:Radiative/xsams:RadiativeTransition/xsams:EnergyWavelength/xsams:Energy/xsams:SourceRef)" />
     <xsl:variable name="frequencyCount" select="count(/xsams:XSAMSData/xsams:Processes/xsams:Radiative/xsams:RadiativeTransition/xsams:EnergyWavelength/xsams:Frequency)" />
+    <xsl:variable name="frequencyRefCount" select="count(/xsams:XSAMSData/xsams:Processes/xsams:Radiative/xsams:RadiativeTransition/xsams:EnergyWavelength/xsams:Frequency/xsams:SourceRef)" />
     <xsl:variable name="transitionProbabilityCount" select="count(/xsams:XSAMSData/xsams:Processes/xsams:Radiative/xsams:RadiativeTransition/xsams:Probability/xsams:TransitionProbabilityA)" />
     <xsl:variable name="oscillatorStrengthCount" select="count(/xsams:XSAMSData/xsams:Processes/xsams:Radiative/xsams:RadiativeTransition/xsams:Probability/xsams:OscillatorStrength)" />
     <xsl:variable name="weightedOscillatorStrengthCount" select="count(/xsams:XSAMSData/xsams:Processes/xsams:Radiative/xsams:RadiativeTransition/xsams:Probability/xsams:WeightedOscillatorStrength)" />
@@ -68,225 +72,248 @@
             <body>
                 <div id="page_actions">
                     <fieldset title="Actions">
-                        <legend>Actions</legend>
-                        <button id="reset" >Reset page</button>
-                        <button id="csv_export">Show As Csv</button>
+                        <legend>Menu</legend>                        
+                        <button id="csv_export">Export as CSV</button>
+                        <button id="json_export">Export as JSON</button>
+                        <button id="votable_export">Export as VOTable</button>
                         <input type="submit" id="votable_samp" value="Send with samp" />
+                        <button id="reset" >Reset page</button>
                     </fieldset>
                 </div>
-                <div>
-                    <h1>Sources</h1>
-                    <!--sources table -->
-                    <table id="sources" class="tablesorter">
-                        <thead>
-                            <tr>
-                                <th>Id</th>
-                                <th>Title</th>
-                                <th>Origin</th>
-                                <th>Authors</th>
-                                <th>Year</th>
-                                <th>Link</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <xsl:for-each select="/xsams:XSAMSData/xsams:Sources/xsams:Source">
-                                <xsl:call-template name="fillSourcesTable">
-                                    <xsl:with-param name="source" select="."/>
-                                </xsl:call-template>
-                            </xsl:for-each>
-                        </tbody>
-                    </table>
-                </div>
-                
-                <div id="title">
-                    <h1>Results from <span id="queried_node"><xsl:value-of select="substring(substring-before($requestedNode, '-'), 2)"/></span> VAMDC node</h1>
-                </div>
-                <div id="loader">
-                    <img alt="loading" src='/img/loader_anim.gif'></img> <span> Please wait ... </span>
-                </div>
-                <div>
-                    <!-- ascii export area -->
-                    <pre id="result_ascii"></pre>
-                </div>
-                <div>
-                    <!-- transitions table -->
-                    <table id="transitions" class="tablesorter">
-                        <thead>
-                            <tr>                                
-                                <th id="c1"><span class="title"></span><button id="select_all_lines">Unselect all</button></th>
-                                <th id="c2"><span class="title">Spec Ion</span><div class="remove hideable"><button>X</button></div></th>
-                                <th id="c3"><span class="title">Wavelength(A)</span><div class="remove hideable"><button>X</button></div></th>
-                                
-                                <xsl:if test="$radiativeTransitionRefCount &gt; 0 or $wavelengthRefCount &gt; 0">
-                                    <th id="c4"><span class="title">Transition reference</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>
-                                
-                                <xsl:if test="$wavenumberCount &gt; 0">
-                                    <th id="c5"><span class="title">Wavenumber</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>
-                                
-                                <xsl:if test="$energyCount &gt; 0">
-                                    <th id="c6"><span class="title">Energy</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>
-                                
-                                <xsl:if test="$frequencyCount &gt; 0">
-                                    <th id="c7"><span class="title">Frequency</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>
-                                
-                                <xsl:if test="$transitionProbabilityCount &gt; 0">
-                                    <th id="c8"><span class="title">A</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>
-                                
-                                <xsl:if test="$oscillatorStrengthCount &gt; 0">
-                                    <th id="c9"><span class="title">Oscillator Strength</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>   
-                                
-                                <xsl:if test="$weightedOscillatorStrengthCount &gt; 0">
-                                    <th id="c10"><span class="title">Weighted Oscillator Strength</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>                                   
+                <div id="page_content">
+                  <div>
+                      <!-- ascii export area -->
+                      <textarea id="result_export" rows="50" cols="150"></textarea>
+                  </div>
+                  <div>
+                      <strong>Sources</strong>
+                      <!--sources table -->
+                      <table id="sources" class="tablesorter">
+                          <thead>
+                              <tr>
+                                  <th>Id</th>
+                                  <th>Title</th>
+                                  <th>Origin</th>
+                                  <th>Authors</th>
+                                  <th>Year</th>
+                                  <th>Link</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              <xsl:for-each select="/xsams:XSAMSData/xsams:Sources/xsams:Source">
+                                  <xsl:call-template name="fillSourcesTable">
+                                      <xsl:with-param name="source" select="."/>
+                                  </xsl:call-template>
+                              </xsl:for-each>
+                          </tbody>
+                      </table>
+                  </div>
+                  
+                  <div id="title">
+                      <strong>Results from <span id="queried_node"><xsl:value-of select="substring(substring-before($requestedNode, '-'), 2)"/></span> VAMDC node</strong>
+                  </div>                  
+                  <div id="loader">
+                      <img alt="loading" src='/img/loader_anim.gif'></img> <span> Please wait ... </span>
+                  </div>
+                  <div>
+                      <!-- transitions table -->
+                      <table id="transitions" class="tablesorter">
+                          <thead>
+                              <tr>                                
+                                  <th id="c1"><span class="title"></span><button id="select_all_lines">Unselect all</button></th>
+                                  <th id="c2"><span class="title">Spec Ion</span><div class="remove hideable"><button>X</button></div></th>
+                                  
+                                  <xsl:if test="$radiativeTransitionRefCount &gt; 0">
+                                      <th id="c3"><span class="title">Transition reference</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>                            
+                                  
+                                  <xsl:if test="$wavelengthCount &gt; 0">
+                                      <th id="c4"><span class="title">Wavelength(A)</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>                                  
+                                  
+                                  <xsl:if test="$wavelengthRefCount &gt; 0">
+                                      <th id="c5"><span class="title">Wavelength reference</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>  
+                                  
+                                  <xsl:if test="$wavenumberCount &gt; 0">
+                                      <th id="c6"><span class="title">Wavenumber</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>
+                                  
+                                  <xsl:if test="$wavenumberRefCount &gt; 0">
+                                      <th id="c7"><span class="title">Wavenumber reference</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>                                  
+                                  
+                                  <xsl:if test="$energyCount &gt; 0">
+                                      <th id="c8"><span class="title">Energy</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>
+                                  
+                                  <xsl:if test="$energyRefCount &gt; 0">
+                                      <th id="c9"><span class="title">Energy reference</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>                                  
+                                  
+                                  <xsl:if test="$frequencyCount &gt; 0">
+                                      <th id="c10"><span class="title">Frequency</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>
+                                  
+                                  <xsl:if test="$frequencyRefCount &gt; 0">
+                                      <th id="c11"><span class="title">Frequency reference</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>                                  
+                                  
+                                  <xsl:if test="$transitionProbabilityCount &gt; 0">
+                                      <th id="c12"><span class="title">A</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>
+                                  
+                                  <xsl:if test="$oscillatorStrengthCount &gt; 0">
+                                      <th id="c13"><span class="title">Oscillator Strength</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>   
+                                  
+                                  <xsl:if test="$weightedOscillatorStrengthCount &gt; 0">
+                                      <th id="c14"><span class="title">Weighted Oscillator Strength</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>                                   
 
-                                <xsl:if test="$log10WeightedOscillatorStrengthCount &gt; 0">
-                                    <th id="c11"><span class="title">Log10 Weighted Oscillator Strength</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>                               
-                                
-                                <xsl:if test="$stateDescriptionCount &gt; 0">
-                                    <th id="c12"><span class="title">Lower state description</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>   
-                                
-                                <xsl:if test="$stateRefCount &gt; 0">
-                                    <th id="c13"><span class="title">Lower state source</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>   
-                                
-                                <xsl:if test="$stateEnergyCount &gt; 0">
-                                    <th id="c14"><span class="title">Lower energy(<xsl:value-of select="$stateEnergyUnit"/>)</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>   
-                                
-                                <xsl:if test="$ionizationEnergyCount &gt; 0">
-                                    <th id="c15"><span class="title">Lower ionization(<xsl:value-of select="$ionizationEnergyUnit"/>)</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>   
-                                
-                                <xsl:if test="$lifeTimeCount &gt; 0">
-                                    <th id="c16"><span class="title">Lower lifetime</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>       
-                                
-                                <xsl:if test="$statisticalWeightCount &gt; 0">
-                                    <th id="c17"><span class="title">Lower statistical weight</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>       
-                                
-                                <xsl:if test="$parityCount &gt; 0">
-                                    <th id="c18"><span class="title">Lower parity</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>           
-                                
-                                <xsl:if test="$totalAngularMomentumCount &gt; 0">    
-                                    <th id="c19"><span class="title">Lower total angular momentum</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>
-                                
-                                
-                                <xsl:if test="$kappaCount &gt; 0">    
-                                    <th id="c20"><span class="title">Lower kappa</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>           
-                                
-                                <xsl:if test="$hyperfineMomentumCount &gt; 0">   
-                                    <th id="c21"><span class="title">Lower hyperfine momentum</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>    
-                                
-                                <xsl:if test="$magneticQuantumNumberCount &gt; 0">
-                                    <th id="c22"><span class="title">Lower magnetic quantum number</span><div class="remove hideable"><button>X</button></div></th>		
-                                </xsl:if>    
-                                
-                                <xsl:if test="$mixingCoefficientCount &gt; 0">
-                                    <th id="c23"><span class="title">Lower mixing coeff</span><div class="remove hideable"><button>X</button></div></th>     
-                                </xsl:if>   
-                                
-                                <xsl:if test="$configurationLabelCount &gt; 0">     
-                                    <th id="c24"><span class="title">Lower configuration</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>
-                                
-                                <xsl:if test="$termLabelCount &gt; 0">
-                                    <th id="c25"><span class="title">Lower term label</span><div class="remove hideable"><button>X</button></div></th> 
-                                </xsl:if>  
-                                
-                                <xsl:if test="$termCouplingCount &gt; 0">
-                                  <th id="c26"><span class="title">Lower coupling</span><div class="remove hideable"><button>X</button></div></th>   
-                                </xsl:if>
-                                
-                                <xsl:if test="$stateDescriptionCount &gt; 0">
-                                    <th id="c27"><span class="title">Upper state description</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>  
-                                
-                                <xsl:if test="$stateRefCount &gt; 0">
-                                    <th id="c28"><span class="title">Upper state source</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>   
-                                
-                                <xsl:if test="$stateEnergyCount &gt; 0">
-                                    <th id="c29"><span class="title">Upper energy(<xsl:value-of select="$stateEnergyUnit"/>)</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>  
-                                
-                                <xsl:if test="$ionizationEnergyCount &gt; 0">
-                                    <th id="c30"><span class="title">Upper ionization(<xsl:value-of select="$ionizationEnergyUnit"/>)</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>  
-                                
-                                <xsl:if test="$lifeTimeCount &gt; 0">
-                                    <th id="c31"><span class="title">Upper lifetime</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>  
-                                
-                                <xsl:if test="$statisticalWeightCount &gt; 0">
-                                    <th id="c32"><span class="title">Upper statistical weight</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>  
-                                
-                                <xsl:if test="$parityCount &gt; 0">
-                                    <th id="c33"><span class="title">Upper parity</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>  
-                                
-                                <xsl:if test="$totalAngularMomentumCount &gt; 0">    
-                                    <th id="c34"><span class="title">Upper total angular momentum</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>  
-                                
-                                <xsl:if test="$kappaCount &gt; 0">    
-                                    <th id="c35"><span class="title">Upper kappa</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>  
-                                
-                                <xsl:if test="$hyperfineMomentumCount &gt; 0">   
-                                    <th id="c36"><span class="title">Upper hyperfine momentum</span><div class="remove hideable"><button>X</button></div></th>
-                                </xsl:if>
-                                
-                                <xsl:if test="$magneticQuantumNumberCount &gt; 0">
-                                    <th id="c37"><span class="title">Upper magnetic quantum number</span><div class="remove hideable"><button>X</button></div></th>  
-                                </xsl:if>
-                                
-                                <xsl:if test="$mixingCoefficientCount &gt; 0">
-                                    <th id="c38"><span class="title">Upper mixing coeff</span><div class="remove hideable"><button>X</button></div></th>      
-                                </xsl:if>
-                                
-                                <xsl:if test="$configurationLabelCount &gt; 0">
-                                    <th id="c39"><span class="title">Upper configuration</span><div class="remove hideable"><button>X</button></div></th>   
-                                </xsl:if>
-                                
-                                <xsl:if test="$termLabelCount &gt; 0">
-                                    <th id="c40"><span class="title">Upper term label</span><div class="remove hideable"><button>X</button></div></th>   
-                                </xsl:if>
-                                
-                                <xsl:if test="$termCouplingCount &gt; 0">
-                                  <th id="c41"><span class="title">Upper coupling</span><div class="remove hideable"><button>X</button></div></th>   
-                                </xsl:if>
-                            </tr>
-                        </thead>
-                        <tbody>    
-                            <xsl:for-each select="/xsams:XSAMSData/xsams:Processes/xsams:Radiative/xsams:RadiativeTransition">
-                                <xsl:call-template name="fillTransitionTable">
-                                    <xsl:with-param name="radTran" select="."/>
-                                </xsl:call-template>
-                            </xsl:for-each>     
-                        </tbody>        
-                    </table>
-                </div>
-                <div class="hidden" id="sources_text">
-                    <xsl:for-each select="/xsams:XSAMSData/xsams:Sources/xsams:Source">
-                        <xsl:call-template name="getSourcesAsText">
-                            <xsl:with-param name="source" select="."/>
-                        </xsl:call-template>
-                    </xsl:for-each>
-                </div>
+                                  <xsl:if test="$log10WeightedOscillatorStrengthCount &gt; 0">
+                                      <th id="c15"><span class="title">Log10 Weighted Oscillator Strength</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>                               
+                                  
+                                  <xsl:if test="$stateDescriptionCount &gt; 0">
+                                      <th id="c16"><span class="title">Lower state description</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>   
+                                  
+                                  <xsl:if test="$stateRefCount &gt; 0">
+                                      <th id="c17"><span class="title">Lower state source</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>   
+                                  
+                                  <xsl:if test="$stateEnergyCount &gt; 0">
+                                      <th id="c18"><span class="title">Lower energy(<xsl:value-of select="$stateEnergyUnit"/>)</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>   
+                                  
+                                  <xsl:if test="$ionizationEnergyCount &gt; 0">
+                                      <th id="c19"><span class="title">Lower ionization(<xsl:value-of select="$ionizationEnergyUnit"/>)</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>   
+                                  
+                                  <xsl:if test="$lifeTimeCount &gt; 0">
+                                      <th id="c20"><span class="title">Lower lifetime</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>       
+                                  
+                                  <xsl:if test="$statisticalWeightCount &gt; 0">
+                                      <th id="c21"><span class="title">Lower statistical weight</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>       
+                                  
+                                  <xsl:if test="$parityCount &gt; 0">
+                                      <th id="c22"><span class="title">Lower parity</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>           
+                                  
+                                  <xsl:if test="$totalAngularMomentumCount &gt; 0">    
+                                      <th id="c23"><span class="title">Lower total angular momentum</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>
+                                  
+                                  
+                                  <xsl:if test="$kappaCount &gt; 0">    
+                                      <th id="c24"><span class="title">Lower kappa</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>           
+                                  
+                                  <xsl:if test="$hyperfineMomentumCount &gt; 0">   
+                                      <th id="c25"><span class="title">Lower hyperfine momentum</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>    
+                                  
+                                  <xsl:if test="$magneticQuantumNumberCount &gt; 0">
+                                      <th id="c26"><span class="title">Lower magnetic quantum number</span><div class="remove hideable"><button>X</button></div></th>		
+                                  </xsl:if>    
+                                  
+                                  <xsl:if test="$mixingCoefficientCount &gt; 0">
+                                      <th id="c27"><span class="title">Lower mixing coeff</span><div class="remove hideable"><button>X</button></div></th>     
+                                  </xsl:if>   
+                                  
+                                  <xsl:if test="$configurationLabelCount &gt; 0">     
+                                      <th id="c28"><span class="title">Lower configuration</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>
+                                  
+                                  <xsl:if test="$termLabelCount &gt; 0">
+                                      <th id="c29"><span class="title">Lower term label</span><div class="remove hideable"><button>X</button></div></th> 
+                                  </xsl:if>  
+                                  
+                                  <xsl:if test="$termCouplingCount &gt; 0">
+                                    <th id="c30"><span class="title">Lower coupling</span><div class="remove hideable"><button>X</button></div></th>   
+                                  </xsl:if>
+                                  
+                                  <xsl:if test="$stateDescriptionCount &gt; 0">
+                                      <th id="c31"><span class="title">Upper state description</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>  
+                                  
+                                  <xsl:if test="$stateRefCount &gt; 0">
+                                      <th id="c32"><span class="title">Upper state source</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>   
+                                  
+                                  <xsl:if test="$stateEnergyCount &gt; 0">
+                                      <th id="c33"><span class="title">Upper energy(<xsl:value-of select="$stateEnergyUnit"/>)</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>  
+                                  
+                                  <xsl:if test="$ionizationEnergyCount &gt; 0">
+                                      <th id="c34"><span class="title">Upper ionization(<xsl:value-of select="$ionizationEnergyUnit"/>)</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>  
+                                  
+                                  <xsl:if test="$lifeTimeCount &gt; 0">
+                                      <th id="c35"><span class="title">Upper lifetime</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>  
+                                  
+                                  <xsl:if test="$statisticalWeightCount &gt; 0">
+                                      <th id="c36"><span class="title">Upper statistical weight</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>  
+                                  
+                                  <xsl:if test="$parityCount &gt; 0">
+                                      <th id="c37"><span class="title">Upper parity</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>  
+                                  
+                                  <xsl:if test="$totalAngularMomentumCount &gt; 0">    
+                                      <th id="c38"><span class="title">Upper total angular momentum</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>  
+                                  
+                                  <xsl:if test="$kappaCount &gt; 0">    
+                                      <th id="c39"><span class="title">Upper kappa</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>  
+                                  
+                                  <xsl:if test="$hyperfineMomentumCount &gt; 0">   
+                                      <th id="c40"><span class="title">Upper hyperfine momentum</span><div class="remove hideable"><button>X</button></div></th>
+                                  </xsl:if>
+                                  
+                                  <xsl:if test="$magneticQuantumNumberCount &gt; 0">
+                                      <th id="c41"><span class="title">Upper magnetic quantum number</span><div class="remove hideable"><button>X</button></div></th>  
+                                  </xsl:if>
+                                  
+                                  <xsl:if test="$mixingCoefficientCount &gt; 0">
+                                      <th id="c42"><span class="title">Upper mixing coeff</span><div class="remove hideable"><button>X</button></div></th>      
+                                  </xsl:if>
+                                  
+                                  <xsl:if test="$configurationLabelCount &gt; 0">
+                                      <th id="c43"><span class="title">Upper configuration</span><div class="remove hideable"><button>X</button></div></th>   
+                                  </xsl:if>
+                                  
+                                  <xsl:if test="$termLabelCount &gt; 0">
+                                      <th id="c44"><span class="title">Upper term label</span><div class="remove hideable"><button>X</button></div></th>   
+                                  </xsl:if>
+                                  
+                                  <xsl:if test="$termCouplingCount &gt; 0">
+                                    <th id="c45"><span class="title">Upper coupling</span><div class="remove hideable"><button>X</button></div></th>   
+                                  </xsl:if>
+                              </tr>
+                          </thead>
+                          <tbody>    
+                              <xsl:for-each select="/xsams:XSAMSData/xsams:Processes/xsams:Radiative/xsams:RadiativeTransition">
+                                  <xsl:call-template name="fillTransitionTable">
+                                      <xsl:with-param name="radTran" select="."/>
+                                  </xsl:call-template>
+                              </xsl:for-each>     
+                          </tbody>        
+                      </table>
+                  </div>
+                  <div class="hidden" id="sources_text">
+                      <xsl:for-each select="/xsams:XSAMSData/xsams:Sources/xsams:Source">
+                          <xsl:call-template name="getSourcesAsText">
+                              <xsl:with-param name="source" select="."/>
+                          </xsl:call-template>
+                      </xsl:for-each>
+                  </div>
+              </div>
             <script type="text/javascript" src="/js/jquery.js"></script>
             <script type="text/javascript" src="/js/ajax_settings.js"></script>
             <script type="text/javascript" src="/js/atomic_columns.js"></script>
@@ -349,7 +376,7 @@
         <xsl:variable name="sourceId" select="$source/@sourceID"/>
         <xsl:variable name="sourceUri" select="$source/xsams:UniformResourceIdentifier"/>
         <xsl:if test="contains($source/xsams:Comments,'is a self-reference') = false()">
-#Source:<xsl:value-of select="$sourceId"/>,<xsl:value-of select="$source/xsams:Title"/>, <xsl:value-of select="$source/xsams:Category"/>, <xsl:value-of select="$source/xsams:SourceName"/>,<xsl:for-each select="$source/xsams:Authors/xsams:Author"><xsl:value-of select="xsams:Name" />;</xsl:for-each>,<xsl:value-of select="$source/xsams:Year"/>,<xsl:value-of select="$source/xsams:UniformResourceIdentifier"/>
+#<xsl:value-of select="$sourceId"/>::<xsl:value-of select="$source/xsams:Title"/>::<xsl:value-of select="$source/xsams:Category"/>::<xsl:value-of select="$source/xsams:SourceName"/>::<xsl:for-each select="$source/xsams:Authors/xsams:Author"><xsl:value-of select="xsams:Name" />;</xsl:for-each>,<xsl:value-of select="$source/xsams:Year"/>::<xsl:value-of select="$source/xsams:UniformResourceIdentifier"/>
         </xsl:if>
     </xsl:template>
     
@@ -371,130 +398,146 @@
                 </a>                
             </td>
             
-            <td data-columnid="c3">
-                <xsl:value-of select='format-number($radTran/xsams:EnergyWavelength/xsams:Wavelength/xsams:Value, "###0000.0000", "fixnan")'/>
-            </td>
-            
-            <xsl:choose>
-                <xsl:when test="$radiativeTransitionRefCount &gt; 0">     
-                    <xsl:variable name="sourceId" select="$radTran/xsams:SourceRef"/>
-                    <td data-columnid="c4"><a href="#{$sourceId}"><xsl:value-of select="$sourceId"/></a></td>
-                </xsl:when>        
-                <xsl:when test="$wavelengthRefCount &gt; 0">     
-                    <xsl:variable name="sourceId" select="$radTran/xsams:EnergyWavelength/xsams:Wavelength/xsams:SourceRef"/>
-                    <td data-columnid="c4"><a href="#{$sourceId}"><xsl:value-of select="$sourceId"/></a></td>
-                </xsl:when>   
-            </xsl:choose>
-            
+            <xsl:if test="$radiativeTransitionRefCount &gt; 0">
+                <xsl:variable name="sourceId" select="$radTran/xsams:SourceRef"/>
+                <td data-columnid="c3"><a href="#{$sourceId}"><xsl:value-of select="$sourceId"/></a></td>
+            </xsl:if>            
+                      
+            <xsl:if test="$wavelengthCount &gt; 0">
+              <td data-columnid="c4">
+                  <xsl:value-of select='$radTran/xsams:EnergyWavelength/xsams:Wavelength[1]/xsams:Value'/>
+              </td>
+            </xsl:if>       
+
+            <xsl:if test="$wavelengthRefCount &gt; 0">
+                    <xsl:variable name="sourceId" select="$radTran/xsams:EnergyWavelength/xsams:Wavelength[1]/xsams:SourceRef"/>
+                    <td data-columnid="c5"><a href="#{$sourceId}"><xsl:value-of select="$sourceId"/></a></td>
+            </xsl:if>   
+                                    
             <xsl:if test="$wavenumberCount &gt; 0">
-                <td data-columnid="c5">
-                    <xsl:value-of select='format-number($radTran/xsams:EnergyWavelength/xsams:Wavenumber/xsams:Value, "###0000.0000", "fixnan")'/>
+                <td data-columnid="c6">
+                    <xsl:value-of select='$radTran/xsams:EnergyWavelength/xsams:Wavenumber[1]/xsams:Value'/>
                 </td>
             </xsl:if>
+            
+            <xsl:if test="$wavenumberRefCount &gt; 0">
+                    <xsl:variable name="sourceId" select="$radTran/xsams:EnergyWavelength/xsams:Wavenumber[1]/xsams:SourceRef"/>
+                    <td data-columnid="c7"><a href="#{$sourceId}"><xsl:value-of select="$sourceId"/></a></td>
+            </xsl:if>   
             
             <xsl:if test="$energyCount &gt; 0">
-                <td data-columnid="c6">
-                    <xsl:value-of select='format-number($radTran/xsams:EnergyWavelength/xsams:Energy/xsams:Value, "###0000.0000", "fixnan")'/>
+                <td data-columnid="c8">
+                    <xsl:value-of select='$radTran/xsams:EnergyWavelength/xsams:Energy[1]/xsams:Value'/>
                 </td>
             </xsl:if>
+            
+            <xsl:if test="$energyRefCount &gt; 0">
+                    <xsl:variable name="sourceId" select="$radTran/xsams:EnergyWavelength/xsams:Energy[1]/xsams:SourceRef"/>
+                    <td data-columnid="c9"><a href="#{$sourceId}"><xsl:value-of select="$sourceId"/></a></td>
+            </xsl:if>   
             
             <xsl:if test="$frequencyCount &gt; 0">
-                <td data-columnid="c7">
-                    <xsl:value-of select='format-number($radTran/xsams:EnergyWavelength/xsams:Frequency/xsams:Value, "###0000.0000", "fixnan")'/>
+                <td data-columnid="c10">
+                    <xsl:value-of select='$radTran/xsams:EnergyWavelength/xsams:Frequency[1]/xsams:Value'/>
                 </td>
             </xsl:if>
             
+            <xsl:if test="$frequencyRefCount &gt; 0">
+                    <xsl:variable name="sourceId" select="$radTran/xsams:EnergyWavelength/xsams:Frequency[1]/xsams:SourceRef"/>
+                    <td data-columnid="c11"><a href="#{$sourceId}"><xsl:value-of select="$sourceId"/></a></td>
+            </xsl:if>   
+            
             <xsl:if test="$transitionProbabilityCount &gt; 0">
-                <td data-columnid="c8">
-                    <xsl:value-of select='format-number($radTran/xsams:Probability/xsams:TransitionProbabilityA/xsams:Value, "###0000.0000", "fixnan")'/>
+                <td data-columnid="c12">
+                    <xsl:value-of select='$radTran/xsams:Probability/xsams:TransitionProbabilityA/xsams:Value'/>
                 </td>			
             </xsl:if>
             
             <xsl:if test="$oscillatorStrengthCount &gt; 0">
-                <td data-columnid="c9">
-                    <xsl:value-of select='format-number($radTran/xsams:Probability/xsams:OscillatorStrength/xsams:Value, "###0000.0000", "fixnan")'/>
+                <td data-columnid="c13">
+                    <xsl:value-of select='$radTran/xsams:Probability/xsams:OscillatorStrength/xsams:Value'/>
                 </td>	
             </xsl:if>
             
             <xsl:if test="$weightedOscillatorStrengthCount &gt; 0">
-                <td data-columnid="c10">
-                    <xsl:value-of select='format-number($radTran/xsams:Probability/xsams:WeightedOscillatorStrength/xsams:Value, "###0000.0000", "fixnan")'/>
+                <td data-columnid="c14">
+                    <xsl:value-of select='$radTran/xsams:Probability/xsams:WeightedOscillatorStrength/xsams:Value'/>
                 </td>	
             </xsl:if>            
 
             <xsl:if test="$log10WeightedOscillatorStrengthCount &gt; 0">
-                <td data-columnid="c11">
-                    <xsl:value-of select='format-number($radTran/xsams:Probability/xsams:Log10WeightedOscillatorStrength/xsams:Value, "###0000.0000", "fixnan")'/>
+                <td data-columnid="c15">
+                    <xsl:value-of select='$radTran/xsams:Probability/xsams:Log10WeightedOscillatorStrength/xsams:Value'/>
                 </td>
             </xsl:if>
             
             <xsl:if test="$stateDescriptionCount &gt; 0">
-                <td data-columnid="c12">
+                <td data-columnid="c16">
                     <xsl:value-of select='$lowerState/xsams:Description'/>
                 </td>      
             </xsl:if>     
             
             <xsl:if test="$stateRefCount &gt; 0">
                 <xsl:variable name="sourceId" select="$lowerState/xsams:SourceRef"/>
-                <td data-columnid="c13"><a href="#{$sourceId}"><xsl:value-of select="$sourceId"/></a></td>
+                <td data-columnid="c17"><a href="#{$sourceId}"><xsl:value-of select="$sourceId"/></a></td>
             </xsl:if>               
             
             <xsl:if test="$stateEnergyCount &gt; 0">
-                <td data-columnid="c14">
-                    <xsl:value-of select='format-number($lowerState/xsams:AtomicNumericalData/xsams:StateEnergy/xsams:Value, "00.0000", "fixnan")'/>
+                <td data-columnid="c18">
+                    <xsl:value-of select='$lowerState/xsams:AtomicNumericalData/xsams:StateEnergy/xsams:Value'/>
                 </td>
             </xsl:if>     
             
             <xsl:if test="$ionizationEnergyCount &gt; 0">
-                <td data-columnid="c15">
-                    <xsl:value-of select='format-number($lowerState/xsams:AtomicNumericalData/xsams:IonizationEnergy/xsams:Value, "00.0000", "fixnan")'/>
+                <td data-columnid="c19">
+                    <xsl:value-of select='$lowerState/xsams:AtomicNumericalData/xsams:IonizationEnergy/xsams:Value'/>
                 </td>
             </xsl:if>
             
             <xsl:if test="$lifeTimeCount &gt; 0">
-                <td data-columnid="c16">
-                    <xsl:value-of select='format-number($lowerState/xsams:AtomicNumericalData/xsams:LifeTime/xsams:Value, "00.0000", "fixnan")'/>				
+                <td data-columnid="c20">
+                    <xsl:value-of select='$lowerState/xsams:AtomicNumericalData/xsams:LifeTime/xsams:Value'/>		
                 </td>
             </xsl:if>
             
             <xsl:if test="$statisticalWeightCount &gt; 0">
-                <td data-columnid="c17">
-                    <xsl:value-of select='format-number($lowerState/xsams:AtomicNumericalData/xsams:StatisticalWeight, "00.0000", "fixnan")'/>
+                <td data-columnid="c21">
+                    <xsl:value-of select='$lowerState/xsams:AtomicNumericalData/xsams:StatisticalWeight'/>
                 </td>			
             </xsl:if>
             
             <xsl:if test="$parityCount &gt; 0">
-                <td data-columnid="c18">
+                <td data-columnid="c22">
                     <xsl:value-of select='$lowerState/xsams:AtomicQuantumNumbers/xsams:Parity'/>				
                 </td>
             </xsl:if>
             
             <xsl:if test="$totalAngularMomentumCount &gt; 0">
-                <td data-columnid="c19">
-                    <xsl:value-of select='format-number($lowerState/xsams:AtomicQuantumNumbers/xsams:TotalAngularMomentum, "0.0", "fixnan")'/>				
+                <td data-columnid="c23">
+                    <xsl:value-of select='$lowerState/xsams:AtomicQuantumNumbers/xsams:TotalAngularMomentum'/>				
                 </td>						
             </xsl:if>
             
             <xsl:if test="$kappaCount &gt; 0">   
-                <td data-columnid="c20">
-                    <xsl:value-of select='format-number($lowerState/xsams:AtomicQuantumNumbers/xsams:Kappa, "0.0", "fixnan")'/>				
+                <td data-columnid="c24">
+                    <xsl:value-of select='$lowerState/xsams:AtomicQuantumNumbers/xsams:Kappa'/>
                 </td>		
             </xsl:if>
             
             <xsl:if test="$hyperfineMomentumCount &gt; 0">   	
-                <td data-columnid="c21">
-                    <xsl:value-of select='format-number($lowerState/xsams:AtomicQuantumNumbers/xsams:HyperfineMomentum, "0.0", "fixnan")'/>				
+                <td data-columnid="c25">
+                    <xsl:value-of select='$lowerState/xsams:AtomicQuantumNumbers/xsams:HyperfineMomentum'/>				
                 </td>	
             </xsl:if>		
             
             <xsl:if test="$magneticQuantumNumberCount &gt; 0">
-                <td data-columnid="c22">
+                <td data-columnid="c26">
                     <xsl:value-of select='$lowerState/xsams:AtomicQuantumNumbers/xsams:MagneticQuantumNumber'/>				
                 </td>	
             </xsl:if>
             
             <xsl:if test="$mixingCoefficientCount &gt; 0">
-                <td data-columnid="c23">
+                <td data-columnid="c27">
                     <xsl:call-template name="mixingCoeff">
                         <xsl:with-param name="AtomicComposition" select="$lowerState/xsams:AtomicComposition" />
                     </xsl:call-template>
@@ -502,7 +545,7 @@
             </xsl:if>
             
             <xsl:if test="$configurationLabelCount &gt; 0"> 
-                <td data-columnid="c24">
+                <td data-columnid="c28">
                     <xsl:call-template name="configuration">
                         <xsl:with-param name="AtomicComposition" select="$lowerState/xsams:AtomicComposition" />
                     </xsl:call-template>
@@ -510,7 +553,7 @@
             </xsl:if>
             
             <xsl:if test="$termLabelCount &gt; 0"> 
-                <td data-columnid="c25">
+                <td data-columnid="c29">
                     <xsl:call-template name="term">
                         <xsl:with-param name="AtomicComposition" select="$lowerState/xsams:AtomicComposition" />
                     </xsl:call-template>
@@ -518,7 +561,7 @@
             </xsl:if>	
             
             <xsl:if test="$termCouplingCount &gt; 0">    
-                <td data-columnid="c26">
+                <td data-columnid="c30">
                     <xsl:call-template name="coupling">
                         <xsl:with-param name="AtomicComposition" select="$lowerState/xsams:AtomicComposition" />
                     </xsl:call-template>
@@ -526,70 +569,70 @@
             </xsl:if>            
             
             <xsl:if test="$stateDescriptionCount &gt; 0">
-                <td data-columnid="c27">
+                <td data-columnid="c31">
                     <xsl:value-of select='$upperState/xsams:Description'/>
                 </td>  
             </xsl:if>	
             
             <xsl:if test="$stateRefCount &gt; 0">
                 <xsl:variable name="sourceId" select="$upperState/xsams:SourceRef"/>
-                <td data-columnid="c28"><a href="#{$sourceId}"><xsl:value-of select="$sourceId"/></a></td>
+                <td data-columnid="c32"><a href="#{$sourceId}"><xsl:value-of select="$sourceId"/></a></td>
             </xsl:if>          
             
             <xsl:if test="$stateEnergyCount &gt; 0">
-                <td data-columnid="c29">
-                    <xsl:value-of select='format-number($upperState/xsams:AtomicNumericalData/xsams:StateEnergy/xsams:Value, "00.0000", "fixnan")'/>
+                <td data-columnid="c33">
+                    <xsl:value-of select='$upperState/xsams:AtomicNumericalData/xsams:StateEnergy/xsams:Value'/>
                 </td>
             </xsl:if>	
             
             <xsl:if test="$ionizationEnergyCount &gt; 0">
-                <td data-columnid="c30">
-                    <xsl:value-of select='format-number($upperState/xsams:AtomicNumericalData/xsams:IonizationEnergy/xsams:Value, "00.0000", "fixnan")'/>
+                <td data-columnid="c34">
+                    <xsl:value-of select='$upperState/xsams:AtomicNumericalData/xsams:IonizationEnergy/xsams:Value'/>
                 </td>
             </xsl:if>	
             
             <xsl:if test="$lifeTimeCount &gt; 0">
-                <td data-columnid="c31">
-                    <xsl:value-of select='format-number($upperState/xsams:AtomicNumericalData/xsams:LifeTime/xsams:Value, "00.0000", "fixnan")'/>
+                <td data-columnid="c35">
+                    <xsl:value-of select='$upperState/xsams:AtomicNumericalData/xsams:LifeTime/xsams:Value'/>
                 </td>
             </xsl:if>	
             
             <xsl:if test="$statisticalWeightCount &gt; 0">
-                <td data-columnid="c32">
-                    <xsl:value-of select='format-number($upperState/xsams:AtomicNumericalData/xsams:StatisticalWeight, "00.0000", "fixnan")'/>
+                <td data-columnid="c36">
+                    <xsl:value-of select='$upperState/xsams:AtomicNumericalData/xsams:StatisticalWeight'/>
                 </td>
             </xsl:if>	
             
             <xsl:if test="$parityCount &gt; 0">
-                <td data-columnid="c33">
+                <td data-columnid="c37">
                     <xsl:value-of select='$upperState/xsams:AtomicQuantumNumbers/xsams:Parity'/>				
                 </td>
             </xsl:if>	
             
             <xsl:if test="$totalAngularMomentumCount &gt; 0">
-                <td data-columnid="c34">
-                    <xsl:value-of select='format-number($upperState/xsams:AtomicQuantumNumbers/xsams:TotalAngularMomentum, "0.0", "fixnan")'/>				
+                <td data-columnid="c38">
+                    <xsl:value-of select='$upperState/xsams:AtomicQuantumNumbers/xsams:TotalAngularMomentum'/>					
                 </td>
             </xsl:if>							
             <xsl:if test="$kappaCount &gt; 0">
-                <td data-columnid="c35">
-                    <xsl:value-of select='format-number($upperState/xsams:AtomicQuantumNumbers/xsams:Kappa, "0.0", "fixnan")'/>				
+                <td data-columnid="c39">
+                    <xsl:value-of select='$upperState/xsams:AtomicQuantumNumbers/xsams:Kappa'/>	
                 </td>
             </xsl:if>		
             <xsl:if test="$hyperfineMomentumCount &gt; 0">			
-                <td data-columnid="c36">
-                    <xsl:value-of select='format-number($upperState/xsams:AtomicQuantumNumbers/xsams:HyperfineMomentum, "0.0", "fixnan")'/>				
+                <td data-columnid="c40">
+                    <xsl:value-of select='$upperState/xsams:AtomicQuantumNumbers/xsams:HyperfineMomentum'/>	
                 </td>	
             </xsl:if>
             
             <xsl:if test="$magneticQuantumNumberCount &gt; 0">				
-                <td data-columnid="c37">
+                <td data-columnid="c41">
                     <xsl:value-of select='$upperState/xsams:AtomicQuantumNumbers/xsams:MagneticQuantumNumber'/>				
                 </td>
             </xsl:if>
             
             <xsl:if test="$mixingCoefficientCount &gt; 0">	
-                <td data-columnid="c38">
+                <td data-columnid="c42">
                     <xsl:call-template name="mixingCoeff">
                         <xsl:with-param name="AtomicComposition" select="$upperState/xsams:AtomicComposition" />
                     </xsl:call-template>
@@ -597,7 +640,7 @@
             </xsl:if>
             
             <xsl:if test="$configurationLabelCount &gt; 0">
-                <td data-columnid="c39">
+                <td data-columnid="c43">
                     <xsl:call-template name="configuration">
                         <xsl:with-param name="AtomicComposition" select="$upperState/xsams:AtomicComposition" />
                     </xsl:call-template>
@@ -605,7 +648,7 @@
             </xsl:if>
             
             <xsl:if test="$termLabelCount &gt; 0">    
-                <td data-columnid="c40">
+                <td data-columnid="c44">
                     <xsl:call-template name="term">
                         <xsl:with-param name="AtomicComposition" select="$upperState/xsams:AtomicComposition" />
                     </xsl:call-template>
@@ -613,7 +656,7 @@
             </xsl:if>
             
             <xsl:if test="$termCouplingCount &gt; 0">    
-                <td data-columnid="c41">
+                <td data-columnid="c45">
                     <xsl:call-template name="coupling">
                         <xsl:with-param name="AtomicComposition" select="$upperState/xsams:AtomicComposition" />
                     </xsl:call-template>
