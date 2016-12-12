@@ -1,5 +1,30 @@
 "use strict";
 
+function Source(id, title, category, name, authors, uri){
+  this.id = id;
+  this.title = title;
+  this.category= category;
+  this.name = name;
+  this.authors = authors;
+  this.uri = uri;
+}
+
+
+var sourceExtractor = {
+  separator :  '::',   
+  
+  getSources : function(source){
+    var results = [];
+    var sources = source.split('#');
+    for(var i = 1; i< sources.length; i++){
+      var parts = sources[i].split(this.separator);
+      results[i-1]= new Source(parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]);
+    }
+    return results;
+  }
+}
+
+
 //manages column display
 function columnManager() {
     /**
@@ -16,28 +41,88 @@ function columnManager() {
      * hide a column by id
      */
     this.hide = function (column) {
-        var position = this.getPosition(column);
-        $('#'+page.table.name+' td:nth-child(' + position + '),'+'#'+page.table.name+' th:nth-child( ' + position + ')').hide();
-        this.hidden[column] = true;
+      var position = this.getPosition(column);
+      $('#'+page.table.name+' td:nth-child(' + position + '),'+'#'+page.table.name+' th:nth-child( ' + position + ')').hide();
+      this.hidden[column] = true;
     }
     
     /**
      * show a column by id
      */
     this.show = function (column) {        
-        var position = this.getPosition(column);        
-        $('#'+page.table.name+' td:nth-child(' + position + '),'+'#'+page.table.name+' th:nth-child( ' + position + ')').show();
-        delete this.hidden[column];
+      var position = this.getPosition(column);        
+      $('#'+page.table.name+' td:nth-child(' + position + '),'+'#'+page.table.name+' th:nth-child( ' + position + ')').show();
+      delete this.hidden[column];
     }
     
     /**
      * show all columns
      */
     this.showAll = function () {
-        var key;
-        for (key in this.hidden) {
-            this.show(key);
+      var key;
+      for (key in this.hidden) {
+        this.show(key);
+      }
+    }
+       
+    
+    /**
+     * export content of visible columns as json
+     */    
+    this.extractAsJson = function () {
+        var result = '{ "node" : "' + $('#queried_node').text()+'", \n';
+        var self = this;
+        //var t_lines = document.getElementById(page.table.name).getElementsByClassName(page.table.tableLineClass);
+        var t_lines = $("."+page.table.tableLineClass);
+        var col_id;
+        
+        var sources = sourceExtractor.getSources($.trim($('#sources_text').text()));
+        result += ' "sources" :  [ ';
+        for(var i = 0;i<sources.length;i++){
+          if(sources[i] != undefined) {
+            result += '{ "id": "' + ((sources[i].id === undefined) ? '' : $.trim(sources[i].id) ) + '",\n' ;           
+            result += '"title": "' + ((sources[i].title === undefined) ? '' : $.trim(sources[i].title)) + '",\n' ;
+            result += '"category": "' + ((sources[i].category === undefined ) ? '' : $.trim(sources[i].category)) +'",\n' ;
+            result += '"name": "' + ((sources[i].name === undefined ) ? '' : $.trim(sources[i].name)) +'",\n' ;
+            result += '"authors": "' + ((sources[i].authors === undefined ) ? '' : $.trim(sources[i].authors)) +'",\n' ;
+            result += '"uri": "' + ((sources[i].uri === undefined ) ? '' : $.trim(sources[i].uri)) +'"}\n' ;     
+          }
+          if(i < sources.length-1)
+            result += ", ";
         }
+        result += '], ';
+        result += ' "data" : [';
+        //get headers
+        var headers = {};
+        $('#' + page.table.name + ' thead tr').children('th').each(function () {
+            col_id = $(this).attr('id');
+            if (self.hidden[col_id] !== true && col_id !== 'c1') {     
+              var header = $.trim($(this).children('.title').text()).split("(");
+              headers[col_id] =  header[0].replace(" " , "_").toLowerCase();
+            }
+        });
+        
+         
+        $(t_lines).each(function () {
+            if (($(this).find('.'+page.table.lineCheckerClass).prop('checked')) === true){ 
+                result += "{ ";
+                $(this).children('td').each(function (i) {
+                    col_id = $(this).attr('data-columnid');
+                    if (i > 0){ // first column is chkbx
+                        if (self.hidden[col_id] !== true) {
+                          //console.log('#'+headers[col_id].replace(' ', '_').toLowerCase()+"#");
+                          result += '"' + headers[col_id] + '"' + ': "'+ $(this).text() + '", \n';
+                        }
+                    }
+                });
+                result = result.substring(0, result.length-3) + "\n";
+                result += "},";                
+            }            
+        });        
+        
+        result = result.substring(0, result.length-1)+" ]\n}";
+        return JSON.stringify(JSON.parse(result),null,4);
+        //this.showResult(JSON.stringify(JSON.parse(result),null,4));
     }
 
     /**
@@ -46,16 +131,16 @@ function columnManager() {
     this.extractAsCsv = function () {
         var result = '#Queried node : ' + $('#queried_node').text()+"\n";
         var self = this;
-        var t_lines = document.getElementById(page.table.name).getElementsByClassName(page.table.tableLineClass);
-        var colId;
+        //var t_lines = document.getElementById(page.table.name).querySelectorAll("."+page.table.tableLineClass);
+        var t_lines = $("."+page.table.tableLineClass);
+        var col_id;
         
-        result += $('#sources_text').text().trim();
+        result += $.trim($('#sources_text').text());//.trim();
         result += "\n#";
         //get headers
         $('#' + page.table.name + ' thead tr').children('th').each(function () {
-            colId = $(this).attr('id');
-	    //alert("self.hidden["+colId+"]"+self.hidden[colId]);
-            if (self.hidden[colId] !== true && colId !== 'c1') {
+            col_id = $(this).attr('id');
+            if (self.hidden[col_id] !== true && col_id !== 'c1') {
                 result += $(this).children('.title').text() + self.separator;
             }
         });
@@ -65,9 +150,9 @@ function columnManager() {
         $(t_lines).each(function () {
             if (($(this).find('.'+page.table.lineCheckerClass).prop('checked')) === true){ 
                 $(this).children('td').each(function (i) {
-                    colId = $(this).attr('data-columnid');
+                    col_id = $(this).attr('data-columnid');
                     if (i > 0){ // first column is chkbx
-                        if (self.hidden[colId] !== true) {
+                        if (self.hidden[col_id] !== true) {
                             result += $(this).text() + self.separator;
                         }
                     }
@@ -76,6 +161,7 @@ function columnManager() {
             result = result.substr(0, result.length - 1) + "\n";
         });
         return result;
+        //this.showResult(result);
     }
     
     /**
@@ -83,46 +169,46 @@ function columnManager() {
      */
     this.extractAsVoTable = function () {
         var result = '<VOTABLE version="1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '+
-                        'xmlns="http://www.ivoa.net/xml/VOTable/v1.2">'+
-                        '<RESOURCE>'+
-                        '<TABLE name="results">'+
-                        '<DESCRIPTION>votable export</DESCRIPTION>';
+                        'xmlns="http://www.ivoa.net/xml/VOTable/v1.2">\n'+
+                        '<RESOURCE>\n'+
+                        '<TABLE name="results">\n'+
+                        '<DESCRIPTION>votable export</DESCRIPTION>\n';
 
-	var colId;
+        var col_id;
         var i = 1;
         var self = this;
         //get headers
         $('#' + page.table.name + ' thead tr').children('th').each(function () {
-	    colId = $(this).attr('id');
-            if (self.hidden[colId] !== true  && colId !== 'c1' ) {
+        col_id = $(this).attr('id');
+            if (self.hidden[col_id] !== true  && col_id !== 'c1' ) {
                 var obj = eval('columns_fields.' + $(this).attr('id'));
-                result += '<FIELD ID="col'+i+'" name="'+$(this).children('.title').text() + '" datatype="' + obj.datatype + '" arraysize="' + obj.arraysize + '" unit="' + obj.unit + '"/>';
+                result += '<FIELD ID="col'+i+'" name="'+$(this).children('.title').text() + '" datatype="' + obj.datatype + '" arraysize="' + obj.arraysize + '" unit="' + obj.unit + '"/>\n';
                 i += 1;
             }
         });
         
-        result += '<DATA><TABLEDATA>';
+        result += '<DATA><TABLEDATA>\n';
     
-        var t_lines = document.getElementById(page.table.name).getElementsByClassName(page.table.tableLineClass);
+        //var t_lines = document.getElementById(page.table.name).getElementsByClassName(page.table.tableLineClass);
+        var t_lines = $("."+page.table.tableLineClass);
         $(t_lines).each(function () {
             if (($(this).find('.' + page.table.lineCheckerClass).prop('checked')) === true){
-                result += "<TR>";
+                result += "<TR>\n";
                 $(this).children('td').each(function (i) {
-		    colId = $(this).attr('data-columnid');
+                    col_id = $(this).attr('data-columnid');
                     if (i > 0){ // first column is chkbx
-                        if (self.hidden[colId] !== true) {
-                            result += '<TD>' + $(this).text() + '</TD>';
+                        if (self.hidden[col_id] !== true) {
+                            result += '<TD>' + $(this).text().replace(/\u00a0/g, " ") + '</TD>\n';
                         }
                     }
-        //            column += 1;
                 });
-          //      column = 1;
-                result += "</TR>";
+                result += "</TR>\n";
             }
         });
         
-        result += '</TABLEDATA></DATA></TABLE></RESOURCE></VOTABLE>';
+        result += '</TABLEDATA>\n</DATA>\n</TABLE>\n</RESOURCE>\n</VOTABLE>\n';
         return result;
+        //this.showResult(result);
     }
     
     this.getPosition = function (name) {
@@ -143,11 +229,13 @@ var page = {
     sampSentCounter : 0,
     loading : 'loader',
     hideResultButton : 'result',
-    exportButton : 'csv_export',
+    csvExportButton : 'csv_export',
+    jsonExportButton : 'json_export',
+    votableExportButton : 'votable_export',
     sampSendButton : 'votable_samp',
     resetButton : 'reset',
     sampConnectionButton : 'samp_connection',
-    exportArea : 'result_ascii',
+    exportArea : 'result_export',
     isSampConnected : false,
     connector : null,
     table : {
@@ -196,6 +284,14 @@ var page = {
     showLoader : function() {
         $('#' + this.loading).show();
     },
+    
+    hideExportArea : function() {
+        $('#' + this.exportArea).hide();
+    },
+
+    showExportArea : function() {
+        $('#' + this.exportArea).show();
+    },
 
     forceRedraw : function(element) {
         if (!element) { return; }
@@ -211,6 +307,13 @@ var page = {
             n.parentNode.removeChild(n);
         }, 20);
     },
+    
+    decodeUri : function(){
+      $('a').find('[data-type="uri"]').each(function(){
+        $('a').attr('href', decodeURIComponent(this.attr('href')));
+      });
+      
+    },
 
     /**
      * reset page display
@@ -219,6 +322,7 @@ var page = {
         this.colManager.showAll();
         $('#' + this.exportArea).html('');
         $("." + this.table.lineCheckerClass).prop('checked', true);
+        page.hideExportArea();
     },
 
     /**
@@ -233,6 +337,11 @@ var page = {
             $('#' + this.exportArea).show();
         }
     },
+    
+    showResult : function( content ){
+      $("#result_export").text(content);
+    },
+    
 
     /**
      * init samp connection object
@@ -252,8 +361,8 @@ var page = {
     sampSend : function(path) {
         var self = this;
         // Broadcasts a table given a hub connection.
-        var send = function(connection) {
-          var msg = new samp.Message("table.load.votable", {"url": path, "name":"table_"+self.sampSentCounter});
+        var send = function(connection) {          
+          var msg = new samp.Message("table.load.votable", {"url": path, "name":$('#queried_node').text()+"_"+self.sampSentCounter});
           connection.notifyAll([msg]);
         };
         this.sampSentCounter +=1;
@@ -274,10 +383,9 @@ var ajax_request = {
      * create a votable on the server, get its url and broadcast via samp
      */  
     broadcastTable : function(){
-	//var urlSubmit = '/webtools/recordtable';
-	var urlSubmit = 'http://xsams-processors.obspm.fr/webtools/recordtable';
-        var path = window.location.pathname.split('/');
-        var req = {'table': page.colManager.extractAsVoTable(), 'table_id' : path[path.length-1]};
+    var urlSubmit = 'http://xsams-processors.obspm.fr/webtools/recordtable';
+    var path = window.location.pathname.split('/');
+    var req = {'table': page.colManager.extractAsVoTable(), 'table_id' : path[path.length-1]};   
 		$.ajax({
 			type: "POST",
 			url: urlSubmit,
@@ -286,12 +394,13 @@ var ajax_request = {
                page.sampSend(data);
             },
             error : function(xhr, status, error){
-                alert(status);
+                alert(xhr.error);                
             }
 	});
 		return false;
     }
 }
+
 
 //close samp connection before leaving page
 $(window).on('beforeunload ', function() {
@@ -299,17 +408,31 @@ $(window).on('beforeunload ', function() {
 });
 
 $(document).ready(function () {
-
+  
+    page.hideExportArea();
     page.hideLoader();
-    page.initSamp();
+    page.initSamp();  
+    
+    page.decodeUri();
+    
 
     $("#" + page.table.name).tablesorter( {
         headers: {0: {sorter: false}}
     });
 
-    $('#' + page.exportButton).click(function () {    //extract as text
-        page.switchLoaderBar();
-        setTimeout(function (){$('#'+page.exportArea).html(page.colManager.extractAsCsv());page.switchLoaderBar();}, 500);
+    $('#' + page.csvExportButton).click(function () {    //extract as text
+        //page.switchLoaderBar();
+        setTimeout(function (){ page.showExportArea();$('#'+page.exportArea).html(page.showResult(page.colManager.extractAsCsv()));/*page.switchLoaderBar();*/}, 500);
+    });
+
+    $('#' + page.jsonExportButton).click(function () {    //extract as text
+        //page.switchLoaderBar();
+        setTimeout(function (){ page.showExportArea();$('#'+page.exportArea).html(page.showResult(page.colManager.extractAsJson()));/*page.switchLoaderBar();*/}, 500);
+    });
+    
+    $('#' + page.votableExportButton).click(function () {    //extract as text
+        //page.switchLoaderBar();
+        setTimeout(function (){ page.showExportArea();$('#'+page.exportArea).html(page.showResult(page.colManager.extractAsVoTable()));/*page.switchLoaderBar();*/}, 500);
     });
 
     $('#' + page.resetButton).click(function () { //reset display, all columns made visible again
